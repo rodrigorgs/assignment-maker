@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -40,6 +41,7 @@ public class AssignmentPackager {
 	private Path outputPath;
 	private Path skeletonPath = Path.of("src/main/resources/skel"); 
 	private boolean shouldBuildAfterCreating = false;
+	private boolean replaceExistingOutputFolder = false;
 	
 	public AssignmentPackager(String organizationName, Path inputPath, Path outputPath) {
 		super();
@@ -179,8 +181,10 @@ public class AssignmentPackager {
 	}
 	
 	private Path createProjectStructure(String filename) throws IOException {
-		Path dest = outputPath.resolve(filename); 
-		
+		Path dest = outputPath.resolve(filename);
+		if (replaceExistingOutputFolder && dest.toFile().exists()) {
+			rm_rf(dest);
+		}
 		createDirectoryIfNotExists(dest);
 		copyFolder(skeletonPath, dest);
 		
@@ -196,6 +200,17 @@ public class AssignmentPackager {
 		}
 	}
 
+	private static boolean rm_rf(Path pathToBeDeleted) {
+	    try {
+			Files.walk(pathToBeDeleted)
+			  .sorted(Comparator.reverseOrder())
+			  .map(Path::toFile)
+			  .forEach(File::delete);
+			return true;
+		} catch (IOException e) {
+			return false;
+		}
+	}
 	public String getOrganizationName() {
 		return organizationName;
 	}
@@ -228,9 +243,19 @@ public class AssignmentPackager {
 		this.shouldBuildAfterCreating = shouldBuildAfterCreating;
 	}
 
+	public boolean isReplaceExistingOutputFolder() {
+		return replaceExistingOutputFolder;
+	}
+
+	public void setReplaceExistingOutputFolder(boolean deleteDestinationIfExists) {
+		this.replaceExistingOutputFolder = deleteDestinationIfExists;
+	}
+
 	public static void main(String[] args) throws IOException {
 		AssignmentPackager packager = new AssignmentPackager("ufba-poo-2022-1", Path.of("."), Path.of("/tmp/assignments/"));
 		packager.setShouldBuildAfterCreating(true);
+		packager.setReplaceExistingOutputFolder(true);
 		packager.generatePackages();
 	}
+
 }
