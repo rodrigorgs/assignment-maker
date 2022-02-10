@@ -1,9 +1,11 @@
 package br.ufba.assignmentmaker.sample;
 
+import java.nio.file.Path;
+
 import br.ufba.assignmentmaker.annotations.Assignment;
+import br.ufba.assignmentmaker.annotations.Remove;
 import br.ufba.assignmentmaker.annotations.ReplaceBodyWithCode;
 import br.ufba.assignmentmaker.annotations.ReplaceBodyWithMethod;
-import br.ufba.assignmentmaker.annotations.Remove;
 
 /**
  * This is an example assignment, and this
@@ -13,6 +15,11 @@ import br.ufba.assignmentmaker.annotations.Remove;
 @Assignment("example-a")
 public class ExampleA {
 	private ExampleADependency dep;
+	
+	public void listFiles() {
+		Path x = Path.of("/tmp");
+		System.out.println(x);
+	}
 	
 	@Remove
 	public void hiddenMethod() {

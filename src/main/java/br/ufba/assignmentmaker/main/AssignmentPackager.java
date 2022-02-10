@@ -91,8 +91,85 @@ public class AssignmentPackager {
 	}
 	
 	private void processAssignment(String filename, CompilationUnit cu, ClassOrInterfaceDeclaration assignmentClass) throws IOException {
-		Path dest = createProjectStructure(filename);
+		Path assignmentPath = createProjectStructure(filename + "--assignment");
+		Path solutionPath = createProjectStructure(filename + "--solution");
+		
+		final String pkgPath = extractPackagePath(cu);
+		
+		// substitute template variables files
+		TemplateScope scope = new TemplateScope();
+		scope.filename = filename;
+		scope.organizationName = organizationName;
+		scope.className = assignmentClass.getNameAsString();
+		substituteTemplateVariables(assignmentPath, scope);
+		substituteTemplateVariables(solutionPath, scope);
 
+		
+		// Each class in its file
+		// TODO: all files share the same imports...
+		cu.findAll(ClassOrInterfaceDeclaration.class).stream().forEach(c -> {
+			c.setModifier(Keyword.PUBLIC, true);
+			
+			// TODO: refactor duplicated code
+			// solution
+			CompilationUnit cuSolution = new CompilationUnit();
+			cu.getPackageDeclaration().ifPresent(p -> { cuSolution.setPackageDeclaration(p); });
+			cuSolution.addType(c);
+			cu.getImports().forEach(i -> { cuSolution.addImport(i); });
+			transformer.removeAnnotationImports(cuSolution);
+			transformer.removeAssignmentAnnotations(cuSolution);
+			writeCompilationUnit(cuSolution, solutionPath, c);
+			
+			// assignment
+			CompilationUnit cuAssignment = new CompilationUnit();
+			cu.getPackageDeclaration().ifPresent(p -> { cuAssignment.setPackageDeclaration(p); });
+			cuAssignment.addType(c);
+			cu.getImports().forEach(i -> { cuAssignment.addImport(i); });
+			ClassOrInterfaceDeclaration classAssignment = cuAssignment.getClassByName(c.getNameAsString()).get(); 
+			transformer.transform(classAssignment);
+			transformer.removeAnnotationImports(cuAssignment);
+			writeCompilationUnit(cuAssignment, assignmentPath, c);
+		});
+	
+		// write test (assignment)
+		String className = assignmentClass.getNameAsString();
+		Path testCasePath = Path.of("src/test/java" + pkgPath + "/" + className + "Tests.java");
+		
+		if (Files.exists(testCasePath)) {
+			// assignment
+			Path assignmentTestPath = assignmentPath.resolve(testCasePath);
+			createDirectoryIfNotExists(assignmentTestPath.getParent());
+			CompilationUnit cuAssignmentTestCase = StaticJavaParser.parse(testCasePath);
+			transformer.transform(cuAssignmentTestCase);
+			Files.write(assignmentTestPath, Arrays.asList(cuAssignmentTestCase.toString()), StandardCharsets.UTF_8);
+			
+			// solution
+			Path solutionTestPath = solutionPath.resolve(testCasePath);
+			createDirectoryIfNotExists(solutionTestPath.getParent());
+			CompilationUnit cuSolutionTestCase = StaticJavaParser.parse(testCasePath);
+			transformer.removeAnnotationImports(cuSolutionTestCase);
+			transformer.removeAssignmentAnnotations(cuSolutionTestCase);
+			Files.write(solutionTestPath, Arrays.asList(cuSolutionTestCase.toString()), StandardCharsets.UTF_8);
+		}
+		
+		// write test (solution)
+				
+		if (shouldBuildAfterCreating) {
+			buildWithMaven(filename, assignmentPath);
+			buildWithMaven(filename, solutionPath);
+		}
+
+		// Create project with all tests (including tests that were hidden from students)
+		Path testProjPath = outputPath.resolve(filename + "--tests");
+		rm_rf(testProjPath); // TODO: check boolean 
+		createDirectoryIfNotExists(testProjPath);
+		Files.copy(testCasePath, testProjPath.resolve(className + "Tests.java"), REPLACE_EXISTING);
+		
+		// TODO: create git repo, already with remote info, ready for pushing into github
+	}
+
+
+	private String extractPackagePath(CompilationUnit cu) {
 		final String pkgPath;
 		Optional<PackageDeclaration> pkgDeclaration = cu.getPackageDeclaration();
 		if (pkgDeclaration.isPresent()) {
@@ -100,51 +177,35 @@ public class AssignmentPackager {
 		} else {
 			pkgPath = "";
 		}
-		
-		// Each class in its file
-		cu.findAll(ClassOrInterfaceDeclaration.class).stream().forEach(c -> {
-			transformer.transform(c);
-			c.setModifier(Keyword.PUBLIC, true);
-			
-			Path relPath = Path.of("src/main/java" + pkgPath + "/" + c.getNameAsString() + ".java");
-			Path pathToWrite = dest.resolve(relPath);
-			try {
-				createDirectoryIfNotExists(pathToWrite.getParent());
-				ArrayList<String> lines = new ArrayList<>();
-				if (!pkgPath.isEmpty()) {
-					lines.add("package " + pkgPath.substring(1).replace('/', '.') + ";\n");
-				}
-				lines.add(c.toString());
-				Files.write(pathToWrite, lines, StandardCharsets.UTF_8);
-			} catch (IOException e) {
-				throw new RuntimeException(e);
+		return pkgPath;
+	}
+
+	private void writeCompilationUnit(CompilationUnit cu, Path dest, ClassOrInterfaceDeclaration c) {
+		String pkgPath = extractPackagePath(cu);
+		Path relPath = Path.of("src/main/java" + pkgPath + "/" + c.getNameAsString() + ".java");
+		Path pathToWrite = dest.resolve(relPath);
+		try {
+			createDirectoryIfNotExists(pathToWrite.getParent());
+			Files.write(pathToWrite, Arrays.asList(cu.toString()), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	private void writeClass(CompilationUnit cu, Path dest, final String pkgPath, ClassOrInterfaceDeclaration c) {
+		Path relPath = Path.of("src/main/java" + pkgPath + "/" + c.getNameAsString() + ".java");
+		Path pathToWrite = dest.resolve(relPath);
+		try {
+			createDirectoryIfNotExists(pathToWrite.getParent());
+			ArrayList<String> lines = new ArrayList<>();
+			if (!pkgPath.isEmpty()) {
+				lines.add("package " + pkgPath.substring(1).replace('/', '.') + ";\n");
 			}
-		});
-	
-		// write test
-		String className = assignmentClass.getNameAsString();
-		Path testPath = Path.of("src/test/java" + pkgPath + "/" + className + "Tests.java");
-		Path destTestPath = dest.resolve(testPath);
-		if (Files.exists(testPath)) {
-			createDirectoryIfNotExists(destTestPath.getParent());
-			String result = transformer.transform(Files.readString(testPath));
-			Files.write(destTestPath, Arrays.asList(result.toString()), StandardCharsets.UTF_8);
+			lines.add(c.toString());
+			Files.write(pathToWrite, lines, StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
-		
-		// transform files
-		TemplateScope scope = new TemplateScope();
-		scope.filename = filename;
-		scope.organizationName = organizationName;
-		scope.className = assignmentClass.getNameAsString();
-		substituteTemplateVariables(dest, scope);
-		
-		if (shouldBuildAfterCreating) {
-			buildWithMaven(filename, dest);
-		}
-		
-		// TODO: create solution project
-		// TODO: create test project
-		// TODO: create git repo, already with remote info, ready for pushing into github
 	}
 
 	private void substituteTemplateVariables(Path dest, TemplateScope scope) throws IOException {

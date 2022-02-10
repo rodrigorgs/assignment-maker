@@ -3,6 +3,7 @@ package br.ufba.assignmentmaker.main;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 
 import com.github.javaparser.StaticJavaParser;
@@ -13,6 +14,7 @@ import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
@@ -35,10 +37,29 @@ public class Transformer {
 			transform(c);
 		});
 		
+		removeAnnotationImports(cu);
+	}
+
+	public void removeAnnotationImports(CompilationUnit cu) {
 		// remove imports that refer to assignmentmaker's annotations
 		cu.findAll(ImportDeclaration.class).stream().forEach(i -> {
 			if (i.getNameAsString().startsWith(Remove.class.getPackageName())) {
 				i.remove();
+			}
+		});
+	}
+	
+	public void removeAssignmentAnnotations(CompilationUnit cu) {
+		cu.findAll(ClassOrInterfaceDeclaration.class).forEach(c -> {
+			removeAssignmentAnnotations(c);
+		});
+	}
+	
+	public void removeAssignmentAnnotations(ClassOrInterfaceDeclaration c) {
+		List<String> annotationsToRemove = Arrays.asList("Assignment", "Remove", "ReplaceBodyWithCode", "ReplaceBodyWithMethod");
+		c.findAll(AnnotationExpr.class).stream().forEach(a -> {
+			if (annotationsToRemove.contains(a.getNameAsString())) {
+				a.remove();
 			}
 		});
 	}
@@ -72,7 +93,6 @@ public class Transformer {
 				if (annotation instanceof SingleMemberAnnotationExpr) {
 					Expression expr = ((SingleMemberAnnotationExpr)annotation).getMemberValue();
 					value = ((StringLiteralExpr)expr).asString(); // we assume that it is a string literal
-					System.out.println("String Value: " + value);
 				}
 
 				BlockStmt body = StaticJavaParser.parseBlock("{" + value + "}");
