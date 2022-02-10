@@ -39,7 +39,6 @@ public class AssignmentPackager {
 	private Path inputPath = Path.of(".");
 	private Path outputPath;
 	private Path skeletonPath = Path.of("src/main/resources/skel"); 
-	// TODO
 	private boolean shouldBuildAfterCreating = false;
 	
 	public AssignmentPackager(String organizationName, Path inputPath, Path outputPath) {
