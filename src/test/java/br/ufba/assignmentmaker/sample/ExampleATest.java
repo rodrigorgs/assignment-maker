@@ -6,7 +6,7 @@ import org.junit.Test;
 
 import br.ufba.assignmentmaker.annotations.Remove;
 
-public class ExampleATests {
+public class ExampleATest {
 
 	@Test
 	public void sumPositiveNumbers() {

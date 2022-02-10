@@ -2,8 +2,11 @@ package br.ufba.assignmentmaker.main;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryNotEmptyException;
@@ -14,6 +17,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -48,6 +53,7 @@ public class AssignmentPackager {
 	private boolean shouldBuildAfterCreating = false;
 	private boolean replaceExistingOutputFolder = false;
 	
+	public static final String TEST_CLASS_SUFFIX = "Test";
 	private Transformer transformer = new Transformer();
 	private MustacheFactory mf = new DefaultMustacheFactory();
 	
@@ -91,8 +97,10 @@ public class AssignmentPackager {
 	}
 	
 	private void processAssignment(String filename, CompilationUnit cu, ClassOrInterfaceDeclaration assignmentClass) throws IOException {
-		Path assignmentPath = createProjectStructure(filename + "--assignment");
-		Path solutionPath = createProjectStructure(filename + "--solution");
+		Path assignmentPath = createProjectStructure(filename + "-assignment");
+		Path solutionPath = createProjectStructure(filename + "-solution");
+		Path testProjPath = outputPath.resolve(filename + "-tests");
+		createDirectoryIfNotExists(testProjPath);
 		
 		final String pkgPath = extractPackagePath(cu);
 		
@@ -133,7 +141,7 @@ public class AssignmentPackager {
 	
 		// write test (assignment)
 		String className = assignmentClass.getNameAsString();
-		Path testCasePath = Path.of("src/test/java" + pkgPath + "/" + className + "Tests.java");
+		Path testCasePath = Path.of("src/test/java" + pkgPath + "/" + className + TEST_CLASS_SUFFIX + ".java");
 		
 		if (Files.exists(testCasePath)) {
 			// assignment
@@ -150,6 +158,9 @@ public class AssignmentPackager {
 			transformer.removeAnnotationImports(cuSolutionTestCase);
 			transformer.removeAssignmentAnnotations(cuSolutionTestCase);
 			Files.write(solutionTestPath, Arrays.asList(cuSolutionTestCase.toString()), StandardCharsets.UTF_8);
+			
+			// Create project with all tests (including tests that were hidden from students)			
+			Files.write(testProjPath.resolve(className + TEST_CLASS_SUFFIX + ".java"), Arrays.asList(cuSolutionTestCase.toString()), StandardCharsets.UTF_8);
 		}
 		
 		// write test (solution)
@@ -159,15 +170,46 @@ public class AssignmentPackager {
 			buildWithMaven(filename, solutionPath);
 		}
 
-		// Create project with all tests (including tests that were hidden from students)
-		Path testProjPath = outputPath.resolve(filename + "--tests");
-		rm_rf(testProjPath); // TODO: check boolean 
-		createDirectoryIfNotExists(testProjPath);
-		Files.copy(testCasePath, testProjPath.resolve(className + "Tests.java"), REPLACE_EXISTING);
-		
-		// TODO: create git repo, already with remote info, ready for pushing into github
+				
+		// Create git repo, already with remote info, ready for pushing into github
+		for (Path path : Arrays.asList(testProjPath, assignmentPath, solutionPath)) {
+			try {
+				exec("git init", path.toFile());
+				exec("git add .", path.toFile());
+				exec("git commit -m \"Initial commit\"", path.toFile());
+				exec("git remote add origin https://github.com/" + organizationName + "/" + path.getFileName(), path.toFile());
+//				exec("gh repo create " + organizationName + "/" + path.getFileName() + " --private", path.toFile());
+//				exec("git push -u origin master", path.toFile());
+			} catch (IOException | InterruptedException e) {
+				System.out.println("Could not init git repository");
+				e.printStackTrace();
+			}
+		}
 	}
 
+	
+	private static void exec(String command, File directory) throws IOException, InterruptedException {
+		boolean isWindows = System.getProperty("os.name")
+				  .toLowerCase().startsWith("windows");
+
+		System.err.println("Running command: " + command);
+		
+		Process process;
+		if (isWindows) {
+		    process = Runtime.getRuntime()
+		      .exec(String.format("cmd.exe /c %s", command), new String[0], directory);
+		} else {
+//			String cmd = String.format("/bin/bash -c \"cd %s; %s\"", directory.getAbsolutePath(), command); 
+//			System.out.println("Running command: " + cmd);
+		    process = Runtime.getRuntime().exec(
+		    		new String[] { "/bin/bash", "-c", command },
+		    		new String[0], directory);
+		}
+		StreamGobbler streamGobbler = 
+		  new StreamGobbler(process.getInputStream(), System.out::println);
+		Executors.newSingleThreadExecutor().submit(streamGobbler);
+		int exitCode = process.waitFor();
+	}
 
 	private String extractPackagePath(CompilationUnit cu) {
 		final String pkgPath;
@@ -350,7 +392,7 @@ public class AssignmentPackager {
 
 	public static void main(String[] args) throws IOException {
 		AssignmentPackager packager = new AssignmentPackager("ufba-poo-2022-1", Path.of("."), Path.of("/tmp/assignments/"));
-		packager.setShouldBuildAfterCreating(true);
+//		packager.setShouldBuildAfterCreating(true);
 		packager.setReplaceExistingOutputFolder(true);
 		packager.generatePackages();
 	}
@@ -379,4 +421,21 @@ class TemplateScope {
 	public void setClassName(String className) {
 		this.className = className;
 	}
+}
+
+// https://www.baeldung.com/run-shell-command-in-java
+class StreamGobbler implements Runnable {
+    private InputStream inputStream;
+    private Consumer<String> consumer;
+
+    public StreamGobbler(InputStream inputStream, Consumer<String> consumer) {
+        this.inputStream = inputStream;
+        this.consumer = consumer;
+    }
+
+    @Override
+    public void run() {
+        new BufferedReader(new InputStreamReader(inputStream)).lines()
+          .forEach(consumer);
+    }
 }

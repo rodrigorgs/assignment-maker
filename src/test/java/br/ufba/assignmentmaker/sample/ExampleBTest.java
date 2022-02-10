@@ -9,7 +9,7 @@ import br.ufba.assignmentmaker.annotations.Remove;
 /**
  *
  */
-public class ExampleBTests {
+public class ExampleBTest {
 
 	@Test
 	public void emptyIsZero() {
