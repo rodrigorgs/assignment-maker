@@ -19,8 +19,9 @@ import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.stmt.BlockStmt;
 
 import br.ufba.assignmentmaker.annotations.Assignment;
-import br.ufba.assignmentmaker.annotations.ReplaceBody;
-import br.ufba.assignmentmaker.annotations.Secret;
+import br.ufba.assignmentmaker.annotations.ReplaceBodyWithCode;
+import br.ufba.assignmentmaker.annotations.ReplaceBodyWithMethod;
+import br.ufba.assignmentmaker.annotations.Remove;
 
 public class Transformer {
 	public static String transform(String sourceCode) {
@@ -36,7 +37,7 @@ public class Transformer {
 		
 		// remove imports that refer to assignmentmaker's annotations
 		cu.findAll(ImportDeclaration.class).stream().forEach(i -> {
-			if (i.getNameAsString().startsWith(Secret.class.getPackageName())) {
+			if (i.getNameAsString().startsWith(Remove.class.getPackageName())) {
 				i.remove();
 			}
 		});
@@ -48,33 +49,41 @@ public class Transformer {
 		});
 		
 		c.findAll(FieldDeclaration.class).stream().forEach(f -> {
-			if (f.getAnnotationByClass(Secret.class).isPresent()) {
+			if (f.getAnnotationByClass(Remove.class).isPresent()) {
 				f.remove();
 			}
 			// TODO: implement all valid annotations
 		});
 		
 		c.findAll(MethodDeclaration.class).stream().forEach(m -> {
-			if (m.getAnnotationByClass(Secret.class).isPresent()) {
+			if (m.getAnnotationByClass(Remove.class).isPresent()) {
 				m.remove();
-			} else if (m.getAnnotationByClass(ReplaceBody.class).isPresent()) {
-				AnnotationExpr annotation = m.getAnnotationByClass(ReplaceBody.class).get();
+			} else if (m.getAnnotationByClass(ReplaceBodyWithCode.class).isPresent()) {
+				AnnotationExpr annotation = m.getAnnotationByClass(ReplaceBodyWithCode.class).get();
 				String value = "";
 				if (annotation instanceof SingleMemberAnnotationExpr) {
 					Expression expr = ((SingleMemberAnnotationExpr)annotation).getMemberValue();
 					value = ((StringLiteralExpr)expr).asString(); // we assume that it is a string literal
 					System.out.println("String Value: " + value);
-				} else {
-					Expression expr = getParameter(annotation, "value");
-					if (expr instanceof StringLiteralExpr) {
-						value = ((StringLiteralExpr)expr).asString();
-					}
 				}
 
 				BlockStmt body = StaticJavaParser.parseBlock("{" + value + "}");
 				m.getBody().get().replace(body);
 				annotation.remove();
 			}
+			
+			m.getAnnotationByClass(ReplaceBodyWithMethod.class).ifPresent(annotation -> {
+				String methodName = ((SingleMemberAnnotationExpr)annotation).getMemberValue().asStringLiteralExpr().asString();
+				List<MethodDeclaration> methodList = c.getMethodsByName(methodName);
+				if (methodList.size() != 1) {
+					throw new RuntimeException("There should be exactly one method with name " + methodName);
+				}
+				MethodDeclaration otherMethod = methodList.get(0);
+				m.setBody(otherMethod.getBody().get());
+				otherMethod.remove();
+				annotation.remove();
+			});
+			
 		});
 	}
 	

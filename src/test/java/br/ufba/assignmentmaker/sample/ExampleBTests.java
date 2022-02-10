@@ -4,7 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-import br.ufba.assignmentmaker.annotations.Secret;
+import br.ufba.assignmentmaker.annotations.Remove;
 
 public class ExampleBTests {
 
@@ -14,7 +14,7 @@ public class ExampleBTests {
 		assertEquals(0, x.quantity());
 	}
 	
-	@Secret
+	@Remove
 	@Test
 	public void sumOfQuantities() {
 		ExampleB x = new ExampleB();

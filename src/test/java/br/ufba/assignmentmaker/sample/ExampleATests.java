@@ -4,7 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-import br.ufba.assignmentmaker.annotations.Secret;
+import br.ufba.assignmentmaker.annotations.Remove;
 
 public class ExampleATests {
 
@@ -13,7 +13,7 @@ public class ExampleATests {
 		assertEquals(3, new ExampleA().sum(1, 2));
 	}
 	
-	@Secret
+	@Remove
 	@Test
 	public void sumNegativeNumbers() {
 		assertEquals(-3, new ExampleA().sum(-1, -2));

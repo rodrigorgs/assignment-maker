@@ -10,6 +10,6 @@ import java.lang.annotation.Target;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
-public @interface ReplaceBody {
-	String value() default "";
+public @interface ReplaceBodyWithMethod {
+	String value();
 }

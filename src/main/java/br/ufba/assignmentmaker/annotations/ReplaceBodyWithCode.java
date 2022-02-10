@@ -6,11 +6,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Method that may be part of the solution, but should be omitted from the
- * student assignment.
+ * Move class to a specific package in assignment
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE})
-public @interface Assignment {
-	String value();
+@Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
+public @interface ReplaceBodyWithCode {
+	String value() default "";
 }

@@ -1,8 +1,9 @@
 package br.ufba.assignmentmaker.sample;
 
 import br.ufba.assignmentmaker.annotations.Assignment;
-import br.ufba.assignmentmaker.annotations.ReplaceBody;
-import br.ufba.assignmentmaker.annotations.Secret;
+import br.ufba.assignmentmaker.annotations.ReplaceBodyWithCode;
+import br.ufba.assignmentmaker.annotations.ReplaceBodyWithMethod;
+import br.ufba.assignmentmaker.annotations.Remove;
 
 /**
  * This is an example assignment, and this
@@ -13,19 +14,23 @@ import br.ufba.assignmentmaker.annotations.Secret;
 public class ExampleA {
 	private ExampleADependency dep;
 	
-	@Secret
+	@Remove
 	public void hiddenMethod() {
 		System.out.println("hidden");
 	}
 	
-	@ReplaceBody("System.out.println(\"change this message\");")
+	@ReplaceBodyWithCode("System.out.println(\"change this message\");")
 	public void replaceableMethod() {
 		System.out.println("Hello World");
 	}
 	
-	@ReplaceBody("return 0;")
+	@ReplaceBodyWithMethod("_sum")
 	public int sum(int a, int b) {
 		return a + b;
+	}
+	
+	public int _sum(int a, int b) {
+		return 0;
 	}
 }
 

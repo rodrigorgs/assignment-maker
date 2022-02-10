@@ -3,15 +3,16 @@ package br.ufba.assignmentmaker.sample;
 import java.util.ArrayList;
 
 import br.ufba.assignmentmaker.annotations.Assignment;
-import br.ufba.assignmentmaker.annotations.ReplaceBody;
-import br.ufba.assignmentmaker.annotations.Secret;
+import br.ufba.assignmentmaker.annotations.ReplaceBodyWithCode;
+import br.ufba.assignmentmaker.annotations.ReplaceBodyWithMethod;
+import br.ufba.assignmentmaker.annotations.Remove;
 
 @Assignment("example-b")
 public class ExampleB {
-	@Secret
+	@Remove
 	private ArrayList<Item> items = new ArrayList<>();
 	
-	@ReplaceBody()
+	@ReplaceBodyWithCode()
 	public void add(Item item) {
 		boolean found = false;
 		for (Item other : items) {
@@ -26,9 +27,13 @@ public class ExampleB {
 		}
 	}
 	
-	@ReplaceBody("return 0;")
+	@ReplaceBodyWithMethod("_quantity")
 	public int quantity() {
 		return items.stream().map(i -> i.getAmount()).reduce(0, (acum, x) -> acum + x);
+	}
+	
+	public int _quantity() {
+		return 0;
 	}
 }
 
@@ -58,7 +63,7 @@ class Item {
 		this.amount = amount;
 	}
 
-	@Secret
+	@Remove
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -67,7 +72,7 @@ class Item {
 		return result;
 	}
 
-	@Secret
+	@Remove
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
