@@ -43,6 +43,8 @@ public class AssignmentPackager {
 	private boolean shouldBuildAfterCreating = false;
 	private boolean replaceExistingOutputFolder = false;
 	
+	private Transformer transformer = new Transformer();
+	
 	public AssignmentPackager(String organizationName, Path inputPath, Path outputPath) {
 		super();
 		this.organizationName = organizationName;
@@ -95,7 +97,7 @@ public class AssignmentPackager {
 		
 		// Each class in its file
 		cu.findAll(ClassOrInterfaceDeclaration.class).stream().forEach(c -> {
-			Transformer.transform(c);
+			transformer.transform(c);
 			c.setModifier(Keyword.PUBLIC, true);
 			
 			Path relPath = Path.of("src/main/java" + pkgPath + "/" + c.getNameAsString() + ".java");
@@ -120,7 +122,7 @@ public class AssignmentPackager {
 		System.out.println(testPath);
 		if (Files.exists(testPath)) {
 			createDirectoryIfNotExists(destTestPath.getParent());
-			String result = Transformer.transform(Files.readString(testPath));
+			String result = transformer.transform(Files.readString(testPath));
 			Files.write(destTestPath, Arrays.asList(result.toString()), StandardCharsets.UTF_8);
 		}
 		

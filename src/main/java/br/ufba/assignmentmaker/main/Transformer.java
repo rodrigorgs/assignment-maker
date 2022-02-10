@@ -8,19 +8,15 @@ import java.util.List;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
-import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.BodyDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Expression;
-import com.github.javaparser.ast.expr.MemberValuePair;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.stmt.BlockStmt;
-import com.github.javaparser.resolution.types.ResolvedType;
 
 import br.ufba.assignmentmaker.annotations.Assignment;
 import br.ufba.assignmentmaker.annotations.Remove;
@@ -28,13 +24,13 @@ import br.ufba.assignmentmaker.annotations.ReplaceBodyWithCode;
 import br.ufba.assignmentmaker.annotations.ReplaceBodyWithMethod;
 
 public class Transformer {
-	public static String transform(String sourceCode) {
+	public String transform(String sourceCode) {
 		CompilationUnit cu = StaticJavaParser.parse(sourceCode);
 		transform(cu);
 		return cu.toString();
 	}
 	
-	public static void transform(CompilationUnit cu) {
+	public void transform(CompilationUnit cu) {
 		cu.findAll(ClassOrInterfaceDeclaration.class).stream().forEach(c -> {
 			transform(c);
 		});
@@ -47,13 +43,13 @@ public class Transformer {
 		});
 	}
 	
-	public static void processRemoveAnnotation(BodyDeclaration<?> elem) {
+	private void processRemoveAnnotation(BodyDeclaration<?> elem) {
 		elem.getAnnotationByClass(Remove.class).ifPresent(annotation -> {
 			elem.remove();
 		});
 	}
 	
-	public static void transform(ClassOrInterfaceDeclaration c) {
+	public void transform(ClassOrInterfaceDeclaration c) {
 		
 		processRemoveAnnotation(c);
 		c.getAnnotationByClass(Assignment.class).ifPresent(annotation -> {
@@ -99,19 +95,20 @@ public class Transformer {
 		});
 	}
 	
-	public static Expression getParameter(AnnotationExpr annotationExpr, String parameterName){
-	    List<MemberValuePair>children = annotationExpr.getChildNodesByType(MemberValuePair.class);
-	    for(MemberValuePair memberValuePair : children){
-	        if(parameterName.equals(memberValuePair.getNameAsString())){
-	            return memberValuePair.getValue();
-	        }
-	    }
-	    return null;
-	}
+//	private static Expression getParameter(AnnotationExpr annotationExpr, String parameterName){
+//	    List<MemberValuePair>children = annotationExpr.getChildNodesByType(MemberValuePair.class);
+//	    for(MemberValuePair memberValuePair : children){
+//	        if(parameterName.equals(memberValuePair.getNameAsString())){
+//	            return memberValuePair.getValue();
+//	        }
+//	    }
+//	    return null;
+//	}
 	
 	public static void main(String[] args) throws IOException {
+		Transformer t = new Transformer();
 		String sourceCode = Files.readString(Path.of("src/main/java/br/ufba/assignmentmaker/sample/ExampleA.java"));
-		String out = transform(sourceCode);
+		String out = t.transform(sourceCode);
 		System.out.println(out);
 	}
 }
