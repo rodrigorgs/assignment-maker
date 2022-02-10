@@ -7,7 +7,7 @@
         name: Autograding
         runs-on: ubuntu-latest
         env:
-          TESTS_REPO: #organization#/#filename#-tests
+          TESTS_REPO: [[organizationName]]/[[filename]]-tests
           TESTS_FOLDER: src/test/java
         steps:
           - name: Baixa código

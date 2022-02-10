@@ -6,6 +6,10 @@ import org.junit.Test;
 
 import br.ufba.assignmentmaker.annotations.Remove;
 
+/**
+ * {{filename}} 
+ *
+ */
 public class ExampleBTests {
 
 	@Test

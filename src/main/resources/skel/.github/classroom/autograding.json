@@ -1,9 +1,9 @@
 {
   "tests": [
     {
-      "name": "#class#Test",
+      "name": "[[className]]Test",
       "setup": "",
-      "run": "mvn -q -B -ntp -Dtest=#class#Test test",
+      "run": "mvn -q -B -ntp -Dtest=[[className]]Test test",
       "input": "",
       "output": "",
       "comparison": "included",

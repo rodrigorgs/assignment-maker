@@ -4,6 +4,7 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import org.apache.commons.io.output.StringBuilderWriter;
 import org.apache.maven.shared.invoker.DefaultInvocationRequest;
 import org.apache.maven.shared.invoker.DefaultInvoker;
 import org.apache.maven.shared.invoker.InvocationRequest;
@@ -31,6 +33,9 @@ import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
+import com.github.mustachejava.DefaultMustacheFactory;
+import com.github.mustachejava.Mustache;
+import com.github.mustachejava.MustacheFactory;
 
 import br.ufba.assignmentmaker.annotations.Assignment;
 
@@ -44,6 +49,7 @@ public class AssignmentPackager {
 	private boolean replaceExistingOutputFolder = false;
 	
 	private Transformer transformer = new Transformer();
+	private MustacheFactory mf = new DefaultMustacheFactory();
 	
 	public AssignmentPackager(String organizationName, Path inputPath, Path outputPath) {
 		super();
@@ -119,7 +125,6 @@ public class AssignmentPackager {
 		String className = assignmentClass.getNameAsString();
 		Path testPath = Path.of("src/test/java" + pkgPath + "/" + className + "Tests.java");
 		Path destTestPath = dest.resolve(testPath);
-		System.out.println(testPath);
 		if (Files.exists(testPath)) {
 			createDirectoryIfNotExists(destTestPath.getParent());
 			String result = transformer.transform(Files.readString(testPath));
@@ -127,11 +132,11 @@ public class AssignmentPackager {
 		}
 		
 		// transform files
-		// TODO: generalize, i.e., transform all files. Maybe use mustache.java
-		sed(dest.resolve("pom.xml"), "#filename#", filename);
-		sed(dest.resolve(".github/workflows/classroom.yml"), "#organization#", organizationName);
-		sed(dest.resolve(".github/workflows/classroom.yml"), "#filename#", filename);
-		sed(dest.resolve(".github/classroom/autograding.json"), "#class#", assignmentClass.getNameAsString());
+		TemplateScope scope = new TemplateScope();
+		scope.filename = filename;
+		scope.organizationName = organizationName;
+		scope.className = assignmentClass.getNameAsString();
+		substituteTemplateVariables(dest, scope);
 		
 		if (shouldBuildAfterCreating) {
 			buildWithMaven(filename, dest);
@@ -142,6 +147,24 @@ public class AssignmentPackager {
 		// TODO: create git repo, already with remote info, ready for pushing into github
 	}
 
+	private void substituteTemplateVariables(Path dest, TemplateScope scope) throws IOException {
+		Files.walk(dest).filter(path -> !Files.isDirectory(path)).forEach(path -> {
+			try {
+				String contents = Files.readString(path);
+				// Change delimiter to [[ ]]
+				Mustache mustache = mf.compile(new StringReader("{{=[[ ]]=}}" + contents), "seila");
+				StringBuilderWriter writer = new StringBuilderWriter();
+				mustache.execute(writer, scope);
+				String result = writer.toString();
+				writer.close();
+				if (!contents.equals(result)) {
+					Files.write(path, Arrays.asList(result), StandardCharsets.UTF_8);
+				}
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		});
+	}
 
 	private void buildWithMaven(String filename, Path dest) {
 		InvocationRequest request = new DefaultInvocationRequest();
@@ -271,4 +294,28 @@ public class AssignmentPackager {
 		packager.generatePackages();
 	}
 
+}
+
+class TemplateScope {
+	public String filename;
+	public String organizationName;
+	public String className;
+	public String getFilename() {
+		return filename;
+	}
+	public void setFilename(String filename) {
+		this.filename = filename;
+	}
+	public String getOrganizationName() {
+		return organizationName;
+	}
+	public void setOrganizationName(String organizationName) {
+		this.organizationName = organizationName;
+	}
+	public String getClassName() {
+		return className;
+	}
+	public void setClassName(String className) {
+		this.className = className;
+	}
 }
