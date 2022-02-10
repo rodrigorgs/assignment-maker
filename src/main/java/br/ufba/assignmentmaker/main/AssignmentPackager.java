@@ -30,6 +30,7 @@ import org.apache.maven.shared.invoker.InvocationResult;
 import org.apache.maven.shared.invoker.Invoker;
 import org.apache.maven.shared.invoker.MavenInvocationException;
 
+import com.github.javaparser.JavaParser;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier.Keyword;
@@ -119,10 +120,11 @@ public class AssignmentPackager {
 			c.setModifier(Keyword.PUBLIC, true);
 			
 			// TODO: refactor duplicated code
+			
 			// solution
 			CompilationUnit cuSolution = new CompilationUnit();
 			cu.getPackageDeclaration().ifPresent(p -> { cuSolution.setPackageDeclaration(p); });
-			cuSolution.addType(c);
+			cuSolution.addType(c.clone());
 			cu.getImports().forEach(i -> { cuSolution.addImport(i); });
 			transformer.removeAnnotationImports(cuSolution);
 			transformer.removeAssignmentAnnotations(cuSolution);
@@ -131,7 +133,7 @@ public class AssignmentPackager {
 			// assignment
 			CompilationUnit cuAssignment = new CompilationUnit();
 			cu.getPackageDeclaration().ifPresent(p -> { cuAssignment.setPackageDeclaration(p); });
-			cuAssignment.addType(c);
+			cuAssignment.addType(c.clone());
 			cu.getImports().forEach(i -> { cuAssignment.addImport(i); });
 			ClassOrInterfaceDeclaration classAssignment = cuAssignment.getClassByName(c.getNameAsString()).get(); 
 			transformer.transform(classAssignment);

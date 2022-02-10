@@ -12,7 +12,7 @@ public class ExampleB {
 	@Remove
 	private ArrayList<Item> items = new ArrayList<>();
 	
-	@ReplaceBodyWithCode()
+	@ReplaceBodyWithCode("")
 	public void add(Item item) {
 		boolean found = false;
 		for (Item other : items) {
