@@ -134,28 +134,39 @@ public class AssignmentPackager {
 		sed(dest.resolve(".github/classroom/autograding.json"), "#class#", assignmentClass.getNameAsString());
 		
 		if (shouldBuildAfterCreating) {
-			InvocationRequest request = new DefaultInvocationRequest();
-			request.setPomFile(dest.resolve("pom.xml").toFile());
-			request.setGoals(Collections.singletonList("install"));
-			 
-			Invoker invoker = new DefaultInvoker();
-//			invoker.setMavenHome(Path.of("/opt/homebrew/bin/mvn").getParent().toFile());
-			invoker.setMavenHome(new File("/opt/homebrew"));
-			try {
-				InvocationResult result = invoker.execute(request);
-				if (result.getExitCode() != 0) {
-					System.out.println("Build failed for " + filename);
-				} else {
-					System.out.println("Build successful for " + filename);
-				}
-			} catch (MavenInvocationException e) {
-				throw new RuntimeException(e);
-			}
+			buildWithMaven(filename, dest);
 		}
 		
 		// TODO: create solution project
 		// TODO: create test project
 		// TODO: create git repo, already with remote info, ready for pushing into github
+	}
+
+
+	private void buildWithMaven(String filename, Path dest) {
+		InvocationRequest request = new DefaultInvocationRequest();
+		request.setPomFile(dest.resolve("pom.xml").toFile());
+		request.setGoals(Collections.singletonList("install"));
+		 
+		Invoker invoker = new DefaultInvoker();
+		String mavenHome = System.getenv("M3_HOME");
+		if (mavenHome == null) {
+			mavenHome = System.getenv("M2_HOME");
+		}
+		if (mavenHome == null) {
+			mavenHome = "/opt/homebrew";
+		}
+		invoker.setMavenHome(new File(mavenHome));
+		try {
+			InvocationResult result = invoker.execute(request);
+			if (result.getExitCode() != 0) {
+				System.out.println("Build failed for " + filename);
+			} else {
+				System.out.println("Build successful for " + filename);
+			}
+		} catch (MavenInvocationException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	public static void sed(Path path, String str, String replacement) {
