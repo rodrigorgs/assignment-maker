@@ -2,18 +2,30 @@ package br.ufba.assignmentmaker.main;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import org.apache.maven.shared.invoker.DefaultInvocationRequest;
+import org.apache.maven.shared.invoker.DefaultInvoker;
+import org.apache.maven.shared.invoker.InvocationRequest;
+import org.apache.maven.shared.invoker.InvocationResult;
+import org.apache.maven.shared.invoker.Invoker;
+import org.apache.maven.shared.invoker.MavenInvocationException;
+
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.Modifier.Keyword;
+import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
@@ -23,39 +35,45 @@ import br.ufba.assignmentmaker.annotations.Assignment;
 
 public class AssignmentPackager {
 
-	private static final String ORGANIZATION = "ufba-poo-2022-1";
-
-	public static void main(String[] args) throws IOException {
-		Path mainPath = Path.of("src/main/java");
-		Path testPath = Path.of("src/test/java");
+	private String organizationName;
+	private Path inputPath = Path.of(".");
+	private Path outputPath;
+	private Path skeletonPath = Path.of("src/main/resources/skel"); 
+	// TODO
+	private boolean shouldBuildAfterCreating = false;
+	
+	public AssignmentPackager(String organizationName, Path inputPath, Path outputPath) {
+		super();
+		this.organizationName = organizationName;
+		this.inputPath = inputPath;
+		this.outputPath = outputPath;
+	}
+	
+	
+	public void generatePackages() throws IOException {
+		Path path = inputPath.resolve(Path.of("src/main/java"));
 		
-		for (Path path : Arrays.asList(mainPath, testPath)) {
-			Files.walk(path)
-	        .filter(p -> p.toString().endsWith(".java"))
-	        .forEach(p -> {
-	        	try {
-					processPath(path, p);
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-	        });			
-		}
-		
-		
-		
-
+		Files.walk(path)
+        .filter(p -> p.toString().endsWith(".java"))
+        .forEach(p -> {
+        	try {
+				processPath(p);
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+        });			
 	}
 
-	private static void processPath(Path basePath, Path path) throws IOException {
+	private void processPath(Path path) throws IOException {
 		CompilationUnit cu = StaticJavaParser.parse(Files.readString(path));
 		
 		cu.findAll(ClassOrInterfaceDeclaration.class).stream().forEach(c -> {
 			Optional<AnnotationExpr> opt = c.getAnnotationByClass(Assignment.class);
 			if (opt.isPresent()) {
 				SingleMemberAnnotationExpr ann = (SingleMemberAnnotationExpr) opt.get();
-				String filename = ((StringLiteralExpr)ann.getMemberValue()).getValue();
+				String filename = ((StringLiteralExpr)ann.getMemberValue()).asString();
 				try {
-					processAssignment(basePath, filename, path, cu, c);
+					processAssignment(filename, cu, c);
 				} catch (IOException e) {
 					throw new RuntimeException(e);
 				}
@@ -63,25 +81,32 @@ public class AssignmentPackager {
 		});
 	}
 	
-	private static void processAssignment(Path basePath, String filename, Path path, CompilationUnit cu, ClassOrInterfaceDeclaration assignmentClass) throws IOException {
+	private void processAssignment(String filename, CompilationUnit cu, ClassOrInterfaceDeclaration assignmentClass) throws IOException {
 		Path dest = createProjectStructure(filename);
 
-		StringBuffer pkgBli = new StringBuffer();
-		// Each class in its file; TODO: change visibilities to public
+		final String pkgPath;
+		Optional<PackageDeclaration> pkgDeclaration = cu.getPackageDeclaration();
+		if (pkgDeclaration.isPresent()) {
+			pkgPath = "/" + pkgDeclaration.get().getNameAsString().replace('.', '/');
+		} else {
+			pkgPath = "";
+		}
+		
+		// Each class in its file
 		cu.findAll(ClassOrInterfaceDeclaration.class).stream().forEach(c -> {
 			Transformer.transform(c);
-			final StringBuffer relPath = new StringBuffer(basePath.toString());
-			cu.getPackageDeclaration().ifPresent(pkg -> {
-				relPath.append("/" + pkg.getNameAsString().replace('.', '/'));
-				if (pkgBli.isEmpty()) {
-					pkgBli.append("/" + pkg.getNameAsString().replace('.', '/'));
-				}
-			});
-			relPath.append("/" + c.getNameAsString() + ".java");
-			Path pathToWrite = dest.resolve(Path.of(relPath.toString()));
+			c.setModifier(Keyword.PUBLIC, true);
+			
+			Path relPath = Path.of("src/main/java" + pkgPath + "/" + c.getNameAsString() + ".java");
+			Path pathToWrite = dest.resolve(relPath);
 			try {
-				createDirectoryIfNotExist(pathToWrite.getParent());
-				Files.write(pathToWrite, Arrays.asList(c.toString()), StandardCharsets.UTF_8);
+				createDirectoryIfNotExists(pathToWrite.getParent());
+				ArrayList<String> lines = new ArrayList<>();
+				if (!pkgPath.isEmpty()) {
+					lines.add("package " + pkgPath.substring(1).replace('/', '.') + ";\n");
+				}
+				lines.add(c.toString());
+				Files.write(pathToWrite, lines, StandardCharsets.UTF_8);
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			}
@@ -89,11 +114,11 @@ public class AssignmentPackager {
 	
 		// write test
 		String className = assignmentClass.getNameAsString();
-		Path testPath = Path.of("src/test/java" + pkgBli + "/" + className + "Tests.java");
+		Path testPath = Path.of("src/test/java" + pkgPath + "/" + className + "Tests.java");
 		Path destTestPath = dest.resolve(testPath);
 		System.out.println(testPath);
 		if (Files.exists(testPath)) {
-			createDirectoryIfNotExist(destTestPath.getParent());
+			createDirectoryIfNotExists(destTestPath.getParent());
 			String result = Transformer.transform(Files.readString(testPath));
 			Files.write(destTestPath, Arrays.asList(result.toString()), StandardCharsets.UTF_8);
 		}
@@ -101,9 +126,29 @@ public class AssignmentPackager {
 		// transform files
 		// TODO: generalize, i.e., transform all files. Maybe use mustache.java
 		sed(dest.resolve("pom.xml"), "#filename#", filename);
-		sed(dest.resolve(".github/workflows/classroom.yml"), "#organization#", ORGANIZATION);
+		sed(dest.resolve(".github/workflows/classroom.yml"), "#organization#", organizationName);
 		sed(dest.resolve(".github/workflows/classroom.yml"), "#filename#", filename);
 		sed(dest.resolve(".github/classroom/autograding.json"), "#class#", assignmentClass.getNameAsString());
+		
+		if (shouldBuildAfterCreating) {
+			InvocationRequest request = new DefaultInvocationRequest();
+			request.setPomFile(dest.resolve("pom.xml").toFile());
+			request.setGoals(Collections.singletonList("install"));
+			 
+			Invoker invoker = new DefaultInvoker();
+//			invoker.setMavenHome(Path.of("/opt/homebrew/bin/mvn").getParent().toFile());
+			invoker.setMavenHome(new File("/opt/homebrew"));
+			try {
+				InvocationResult result = invoker.execute(request);
+				if (result.getExitCode() != 0) {
+					System.out.println("Build failed for " + filename);
+				} else {
+					System.out.println("Build successful for " + filename);
+				}
+			} catch (MavenInvocationException e) {
+				throw new RuntimeException(e);
+			}
+		}
 		
 		// TODO: create solution project
 		// TODO: create test project
@@ -134,18 +179,16 @@ public class AssignmentPackager {
 	    }
 	}
 	
-	private static Path createProjectStructure(String filename) throws IOException {
-		Path dest = Path.of("/tmp/assignments/" + filename); 
+	private Path createProjectStructure(String filename) throws IOException {
+		Path dest = outputPath.resolve(filename); 
 		
-		
-		createDirectoryIfNotExist(dest);
-		// TODO: allow parameterization of skeleton folder
-		copyFolder(Path.of("src/main/resources/skel"), dest);
+		createDirectoryIfNotExists(dest);
+		copyFolder(skeletonPath, dest);
 		
 		return dest;
 	}
 	
-	private static void createDirectoryIfNotExist(Path dest) {
+	private static void createDirectoryIfNotExists(Path dest) {
 		try {
 			Files.createDirectories(dest);
 		} catch (DirectoryNotEmptyException e) {
@@ -153,12 +196,42 @@ public class AssignmentPackager {
 			throw new RuntimeException(e);
 		}
 	}
+
+	public String getOrganizationName() {
+		return organizationName;
+	}
+	
+	public void setOrganizationName(String organizationName) {
+		this.organizationName = organizationName;
+	}
+	
+	public Path getOutputPath() {
+		return outputPath;
+	}
+	
+	public void setOutputPath(Path outputPath) {
+		this.outputPath = outputPath;
+	}
+
+	public Path getSkeletonPath() {
+		return skeletonPath;
+	}
+
+	public void setSkeletonPath(Path skeletonPath) {
+		this.skeletonPath = skeletonPath;
+	}
+
+	public boolean isShouldBuildAfterCreating() {
+		return shouldBuildAfterCreating;
+	}
+
+	public void setShouldBuildAfterCreating(boolean shouldBuildAfterCreating) {
+		this.shouldBuildAfterCreating = shouldBuildAfterCreating;
+	}
+
+	public static void main(String[] args) throws IOException {
+		AssignmentPackager packager = new AssignmentPackager("ufba-poo-2022-1", Path.of("."), Path.of("/tmp/assignments/"));
+		packager.setShouldBuildAfterCreating(true);
+		packager.generatePackages();
+	}
 }
-
-
-//NormalAnnotationExpr annotation = (NormalAnnotationExpr)c.getAnnotationByClass(Assignment.class).get();
-//ArrayInitializerExpr classes = (ArrayInitializerExpr) Transformer.getParameter(annotation, "includeClasses");
-//NodeList<Expression> values = classes.getValues();
-//	ClassExpr klass = (ClassExpr)expr;
-//	String className = klass.getTypeAsString();
-//}

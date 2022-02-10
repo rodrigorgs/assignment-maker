@@ -9,13 +9,17 @@ import br.ufba.assignmentmaker.annotations.Secret;
 public class ExampleBTests {
 
 	@Test
-	public void sumPositiveNumbers() {
-		assertEquals(3, new ExampleA().sum(1, 2));
+	public void emptyIsZero() {
+		ExampleB x = new ExampleB();
+		assertEquals(0, x.quantity());
 	}
 	
 	@Secret
 	@Test
-	public void sumNegativeNumbers() {
-		assertEquals(-3, new ExampleA().sum(-1, -2));
-	}	
+	public void sumOfQuantities() {
+		ExampleB x = new ExampleB();
+		x.add(new Item("a", 3));
+		x.add(new Item("b", 2));
+		assertEquals(5, x.quantity());
+	}
 }

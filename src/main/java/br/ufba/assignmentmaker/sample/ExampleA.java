@@ -1,7 +1,6 @@
 package br.ufba.assignmentmaker.sample;
 
 import br.ufba.assignmentmaker.annotations.Assignment;
-import br.ufba.assignmentmaker.annotations.MoveToPackage;
 import br.ufba.assignmentmaker.annotations.ReplaceBody;
 import br.ufba.assignmentmaker.annotations.Secret;
 
@@ -10,7 +9,6 @@ import br.ufba.assignmentmaker.annotations.Secret;
  * is the statement.
  *
  */
-@MoveToPackage("br.ufba.poo")
 @Assignment("example-a")
 public class ExampleA {
 	private ExampleADependency dep;
@@ -20,9 +18,9 @@ public class ExampleA {
 		System.out.println("hidden");
 	}
 	
-	@ReplaceBody("break;")
+	@ReplaceBody("System.out.println(\"change this message\");")
 	public void replaceableMethod() {
-		System.out.println("replace body");
+		System.out.println("Hello World");
 	}
 	
 	@ReplaceBody("return 0;")

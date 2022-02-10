@@ -5,7 +5,6 @@ import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 
 import br.ufba.assignmentmaker.annotations.Secret;
-import br.ufba.assignmentmaker.sample.ExampleA;
 
 public class ExampleATests {
 

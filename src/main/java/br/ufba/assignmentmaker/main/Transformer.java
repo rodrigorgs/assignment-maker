@@ -4,10 +4,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
@@ -19,28 +19,27 @@ import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.stmt.BlockStmt;
 
 import br.ufba.assignmentmaker.annotations.Assignment;
-import br.ufba.assignmentmaker.annotations.MoveToPackage;
 import br.ufba.assignmentmaker.annotations.ReplaceBody;
 import br.ufba.assignmentmaker.annotations.Secret;
 
 public class Transformer {
 	public static String transform(String sourceCode) {
 		CompilationUnit cu = StaticJavaParser.parse(sourceCode);
-		return transform(cu);
+		transform(cu);
+		return cu.toString();
 	}
-	public static String transform(CompilationUnit cu) {
+	
+	public static void transform(CompilationUnit cu) {
 		cu.findAll(ClassOrInterfaceDeclaration.class).stream().forEach(c -> {
-			Optional<AnnotationExpr> annotation = c.getAnnotationByClass(MoveToPackage.class);
-			if (annotation.isPresent()) {
-				StringLiteralExpr value = (StringLiteralExpr)((SingleMemberAnnotationExpr)annotation.get()).getMemberValue();
-				cu.setPackageDeclaration(value.asString());
-				annotation.get().remove();
-			}
-			
 			transform(c);
 		});
 		
-		return cu.toString();
+		// remove imports that refer to assignmentmaker's annotations
+		cu.findAll(ImportDeclaration.class).stream().forEach(i -> {
+			if (i.getNameAsString().startsWith(Secret.class.getPackageName())) {
+				i.remove();
+			}
+		});
 	}
 	
 	public static void transform(ClassOrInterfaceDeclaration c) {
@@ -63,11 +62,12 @@ public class Transformer {
 				String value = "";
 				if (annotation instanceof SingleMemberAnnotationExpr) {
 					Expression expr = ((SingleMemberAnnotationExpr)annotation).getMemberValue();
-					value = ((StringLiteralExpr)expr).getValue(); // we assume that it is a string literal
+					value = ((StringLiteralExpr)expr).asString(); // we assume that it is a string literal
+					System.out.println("String Value: " + value);
 				} else {
 					Expression expr = getParameter(annotation, "value");
 					if (expr instanceof StringLiteralExpr) {
-						value = ((StringLiteralExpr)expr).getValue();
+						value = ((StringLiteralExpr)expr).asString();
 					}
 				}
 
@@ -77,6 +77,7 @@ public class Transformer {
 			}
 		});
 	}
+	
 	public static Expression getParameter(AnnotationExpr annotationExpr, String parameterName){
 	    List<MemberValuePair>children = annotationExpr.getChildNodesByType(MemberValuePair.class);
 	    for(MemberValuePair memberValuePair : children){
