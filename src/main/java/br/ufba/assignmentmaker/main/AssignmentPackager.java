@@ -142,12 +142,12 @@ public class AssignmentPackager {
 			cu.getPackageDeclaration().ifPresent(p -> { cuAssignment.setPackageDeclaration(p); });
 			cuAssignment.addType(c.clone());
 			cu.getImports().forEach(i -> { cuAssignment.addImport(i); });
-			// TODO
 			TypeDeclaration<?> classAssignment = getTypeByName(cuAssignment, c.getNameAsString());
-//			ClassOrInterfaceDeclaration classAssignment = cuAssignment.getClassByName(c.getNameAsString()).get(); 
 			transformer.transform(classAssignment);
 			transformer.removeAnnotationImports(cuAssignment);
-			writeCompilationUnit(cuAssignment, assignmentPath, c);
+			if (!cuAssignment.findAll(TypeDeclaration.class).isEmpty()) {
+				writeCompilationUnit(cuAssignment, assignmentPath, c);
+			}
 		});
 	
 		// write test (assignment)
