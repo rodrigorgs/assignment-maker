@@ -394,7 +394,7 @@ public class AssignmentPackager {
 
 	public static void main(String[] args) throws IOException {
 		AssignmentPackager packager = new AssignmentPackager("ufba-poo-2022-1", Path.of("."), Path.of("/tmp/assignments/"));
-//		packager.setShouldBuildAfterCreating(true);
+		packager.setShouldBuildAfterCreating(true);
 		packager.setReplaceExistingOutputFolder(true);
 		packager.generatePackages();
 	}

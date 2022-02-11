@@ -10,6 +10,7 @@ import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.body.BodyDeclaration;
+import com.github.javaparser.ast.body.CallableDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
@@ -18,6 +19,8 @@ import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
+import com.github.javaparser.ast.nodeTypes.NodeWithBlockStmt;
+import com.github.javaparser.ast.nodeTypes.NodeWithOptionalBlockStmt;
 import com.github.javaparser.ast.stmt.BlockStmt;
 
 import br.ufba.assignmentmaker.annotations.Assignment;
@@ -56,6 +59,7 @@ public class Transformer {
 	}
 	
 	public void removeAssignmentAnnotations(ClassOrInterfaceDeclaration c) {
+		// TODO: replace string list with reflection
 		List<String> annotationsToRemove = Arrays.asList("Assignment", "Remove", "ReplaceBodyWithCode", "ReplaceBodyWithMethod");
 		c.findAll(AnnotationExpr.class).stream().forEach(a -> {
 			if (annotationsToRemove.contains(a.getNameAsString())) {
@@ -83,35 +87,52 @@ public class Transformer {
 		
 		c.findAll(ConstructorDeclaration.class).stream().forEach(cons -> {
 			processRemoveAnnotation(cons);
+			processReplaceBodyWithCodeAnnotation(cons);
+			processReplaceBodyWithMethodAnnotation(c, cons);
 		});
 		
 		c.findAll(MethodDeclaration.class).stream().forEach(m -> {
 			processRemoveAnnotation(m);
+			processReplaceBodyWithCodeAnnotation(m);
+			processReplaceBodyWithMethodAnnotation(c, m);
 			
-			m.getAnnotationByClass(ReplaceBodyWithCode.class).ifPresent(annotation -> {
-				String value = "";
-				if (annotation instanceof SingleMemberAnnotationExpr) {
-					Expression expr = ((SingleMemberAnnotationExpr)annotation).getMemberValue();
-					value = ((StringLiteralExpr)expr).asString(); // we assume that it is a string literal
-				}
+		});
+	}
 
-				BlockStmt body = StaticJavaParser.parseBlock("{" + value + "}");
-				m.getBody().get().replace(body);
-				annotation.remove();
-			});
-			
-			m.getAnnotationByClass(ReplaceBodyWithMethod.class).ifPresent(annotation -> {
-				String methodName = ((SingleMemberAnnotationExpr)annotation).getMemberValue().asStringLiteralExpr().asString();
-				List<MethodDeclaration> methodList = c.getMethodsByName(methodName);
-				if (methodList.size() != 1) {
-					throw new RuntimeException("There should be exactly one method with name " + methodName);
-				}
-				MethodDeclaration otherMethod = methodList.get(0);
-				m.setBody(otherMethod.getBody().get());
-				otherMethod.remove();
-				annotation.remove();
-			});
-			
+	private void processReplaceBodyWithMethodAnnotation(ClassOrInterfaceDeclaration c, CallableDeclaration<?> m) {
+		m.getAnnotationByClass(ReplaceBodyWithMethod.class).ifPresent(annotation -> {
+			String methodName = ((SingleMemberAnnotationExpr)annotation).getMemberValue().asStringLiteralExpr().asString();
+			List<MethodDeclaration> methodList = c.getMethodsByName(methodName);
+			if (methodList.size() != 1) {
+				throw new RuntimeException("There should be exactly one method with name " + methodName);
+			}
+			MethodDeclaration otherMethod = methodList.get(0);
+			BlockStmt body = otherMethod.getBody().get();
+			if (m instanceof NodeWithOptionalBlockStmt) {
+				((NodeWithOptionalBlockStmt<?>)m).setBody(body);
+			} else {
+				((NodeWithBlockStmt<?>)m).setBody(body);
+			}
+			otherMethod.remove();
+			annotation.remove();
+		});
+	}
+
+	private void processReplaceBodyWithCodeAnnotation(CallableDeclaration<?> m) {
+		m.getAnnotationByClass(ReplaceBodyWithCode.class).ifPresent(annotation -> {
+			String value = "";
+			if (annotation instanceof SingleMemberAnnotationExpr) {
+				Expression expr = ((SingleMemberAnnotationExpr)annotation).getMemberValue();
+				value = ((StringLiteralExpr)expr).asString(); // we assume that it is a string literal
+			}
+
+			BlockStmt body = StaticJavaParser.parseBlock("{" + value + "}");
+			if (m instanceof NodeWithOptionalBlockStmt) {
+				((NodeWithOptionalBlockStmt<?>)m).setBody(body);
+			} else {
+				((NodeWithBlockStmt<?>)m).setBody(body);
+			}
+			annotation.remove();
 		});
 	}
 	
