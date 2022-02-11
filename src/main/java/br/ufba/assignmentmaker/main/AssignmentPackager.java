@@ -122,32 +122,11 @@ public class AssignmentPackager {
 
 		
 		// Each class in its file
-		// TODO: all files share the same imports...
 		cu.findAll(TypeDeclaration.class).stream().forEach(c -> {
 			c.setModifier(Keyword.PUBLIC, true);
 			
-			// TODO: refactor duplicated code
-			
-			// solution
-			CompilationUnit cuSolution = new CompilationUnit();
-			cu.getPackageDeclaration().ifPresent(p -> { cuSolution.setPackageDeclaration(p); });
-			cuSolution.addType(c.clone());
-			cu.getImports().forEach(i -> { cuSolution.addImport(i); });
-			transformer.removeAnnotationImports(cuSolution);
-			transformer.removeAssignmentAnnotations(cuSolution);
-			writeCompilationUnit(cuSolution, solutionPath, c);
-			
-			// assignment
-			CompilationUnit cuAssignment = new CompilationUnit();
-			cu.getPackageDeclaration().ifPresent(p -> { cuAssignment.setPackageDeclaration(p); });
-			cuAssignment.addType(c.clone());
-			cu.getImports().forEach(i -> { cuAssignment.addImport(i); });
-			TypeDeclaration<?> classAssignment = getTypeByName(cuAssignment, c.getNameAsString());
-			transformer.transform(classAssignment);
-			transformer.removeAnnotationImports(cuAssignment);
-			if (!cuAssignment.findAll(TypeDeclaration.class).isEmpty()) {
-				writeCompilationUnit(cuAssignment, assignmentPath, c);
-			}
+			createTypeFile(solutionPath, cu, c, false);
+			createTypeFile(assignmentPath, cu, c, true);
 		});
 	
 		// write test (assignment)
@@ -197,6 +176,27 @@ public class AssignmentPackager {
 				System.out.println("Could not init git repository");
 				e.printStackTrace();
 			}
+		}
+	}
+
+
+	private void createTypeFile(Path projectPath, CompilationUnit cu, TypeDeclaration<?> type, boolean isAssignment) {
+		CompilationUnit newCu = new CompilationUnit();
+		cu.getPackageDeclaration().ifPresent(p -> { newCu.setPackageDeclaration(p); });
+		TypeDeclaration<?> newType = type.clone();
+		newCu.addType(newType);
+		cu.getImports().forEach(i -> { newCu.addImport(i); });
+		
+		if (isAssignment) {
+			transformer.transform(newType);
+			transformer.removeAnnotationImports(newCu);
+		} else {
+			transformer.removeAnnotationImports(newCu);
+			transformer.removeAssignmentAnnotations(newCu);
+		}
+
+		if (!newCu.findAll(TypeDeclaration.class).isEmpty()) {
+			writeCompilationUnit(newCu, projectPath, newType);
 		}
 	}
 
