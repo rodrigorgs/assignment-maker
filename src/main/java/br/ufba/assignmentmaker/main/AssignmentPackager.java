@@ -36,9 +36,12 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier.Keyword;
 import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
+import com.github.javaparser.ast.type.Type;
 import com.github.mustachejava.DefaultMustacheFactory;
 import com.github.mustachejava.Mustache;
 import com.github.mustachejava.MustacheFactory;
@@ -97,6 +100,10 @@ public class AssignmentPackager {
 		});
 	}
 	
+	private TypeDeclaration<?> getTypeByName(CompilationUnit cu, String name) {
+		return cu.getTypes().stream().filter(t -> t.getNameAsString().equals(name)).findFirst().get();
+	}
+	
 	private void processAssignment(String filename, CompilationUnit cu, ClassOrInterfaceDeclaration assignmentClass) throws IOException {
 		Path assignmentPath = createProjectStructure(filename + "-assignment");
 		Path solutionPath = createProjectStructure(filename + "-solution");
@@ -116,7 +123,7 @@ public class AssignmentPackager {
 		
 		// Each class in its file
 		// TODO: all files share the same imports...
-		cu.findAll(ClassOrInterfaceDeclaration.class).stream().forEach(c -> {
+		cu.findAll(TypeDeclaration.class).stream().forEach(c -> {
 			c.setModifier(Keyword.PUBLIC, true);
 			
 			// TODO: refactor duplicated code
@@ -135,7 +142,9 @@ public class AssignmentPackager {
 			cu.getPackageDeclaration().ifPresent(p -> { cuAssignment.setPackageDeclaration(p); });
 			cuAssignment.addType(c.clone());
 			cu.getImports().forEach(i -> { cuAssignment.addImport(i); });
-			ClassOrInterfaceDeclaration classAssignment = cuAssignment.getClassByName(c.getNameAsString()).get(); 
+			// TODO
+			TypeDeclaration<?> classAssignment = getTypeByName(cuAssignment, c.getNameAsString());
+//			ClassOrInterfaceDeclaration classAssignment = cuAssignment.getClassByName(c.getNameAsString()).get(); 
 			transformer.transform(classAssignment);
 			transformer.removeAnnotationImports(cuAssignment);
 			writeCompilationUnit(cuAssignment, assignmentPath, c);
@@ -146,6 +155,8 @@ public class AssignmentPackager {
 		Path testCasePath = Path.of("src/test/java" + pkgPath + "/" + className + TEST_CLASS_SUFFIX + ".java");
 		
 		if (Files.exists(testCasePath)) {
+			// TODO: if, after processing annotations, the cu is empty, don't write the file
+			
 			// assignment
 			Path assignmentTestPath = assignmentPath.resolve(testCasePath);
 			createDirectoryIfNotExists(assignmentTestPath.getParent());
@@ -224,7 +235,7 @@ public class AssignmentPackager {
 		return pkgPath;
 	}
 
-	private void writeCompilationUnit(CompilationUnit cu, Path dest, ClassOrInterfaceDeclaration c) {
+	private void writeCompilationUnit(CompilationUnit cu, Path dest, TypeDeclaration c) {
 		String pkgPath = extractPackagePath(cu);
 		Path relPath = Path.of("src/main/java" + pkgPath + "/" + c.getNameAsString() + ".java");
 		Path pathToWrite = dest.resolve(relPath);

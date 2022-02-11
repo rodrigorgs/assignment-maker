@@ -15,6 +15,7 @@ import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
@@ -36,7 +37,7 @@ public class Transformer {
 	}
 	
 	public void transform(CompilationUnit cu) {
-		cu.findAll(ClassOrInterfaceDeclaration.class).stream().forEach(c -> {
+		cu.findAll(TypeDeclaration.class).stream().forEach(c -> {
 			transform(c);
 		});
 		
@@ -53,12 +54,12 @@ public class Transformer {
 	}
 	
 	public void removeAssignmentAnnotations(CompilationUnit cu) {
-		cu.findAll(ClassOrInterfaceDeclaration.class).forEach(c -> {
+		cu.findAll(TypeDeclaration.class).forEach(c -> {
 			removeAssignmentAnnotations(c);
 		});
 	}
 	
-	public void removeAssignmentAnnotations(ClassOrInterfaceDeclaration c) {
+	public void removeAssignmentAnnotations(TypeDeclaration<?> c) {
 		// TODO: replace string list with reflection
 		List<String> annotationsToRemove = Arrays.asList("Assignment", "Remove", "ReplaceBodyWithCode", "ReplaceBodyWithMethod");
 		c.findAll(AnnotationExpr.class).stream().forEach(a -> {
@@ -74,7 +75,7 @@ public class Transformer {
 		});
 	}
 	
-	public void transform(ClassOrInterfaceDeclaration c) {
+	public void transform(TypeDeclaration<?> c) {
 		
 		processRemoveAnnotation(c);
 		c.getAnnotationByClass(Assignment.class).ifPresent(annotation -> {
@@ -99,7 +100,7 @@ public class Transformer {
 		});
 	}
 
-	private void processReplaceBodyWithMethodAnnotation(ClassOrInterfaceDeclaration c, CallableDeclaration<?> m) {
+	private void processReplaceBodyWithMethodAnnotation(TypeDeclaration<?> c, CallableDeclaration<?> m) {
 		m.getAnnotationByClass(ReplaceBodyWithMethod.class).ifPresent(annotation -> {
 			String methodName = ((SingleMemberAnnotationExpr)annotation).getMemberValue().asStringLiteralExpr().asString();
 			List<MethodDeclaration> methodList = c.getMethodsByName(methodName);
