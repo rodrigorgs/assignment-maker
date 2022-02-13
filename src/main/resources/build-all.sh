@@ -1,6 +1,6 @@
 #!/bin/bash
 
-projects=$( ls -d1 *solution | sed -e s/-solution// )
+projects=$@ || $( ls -d1 *solution | sed -e s/-solution// )
 
 for x in $projects; do
 	cd ${x}-solution
