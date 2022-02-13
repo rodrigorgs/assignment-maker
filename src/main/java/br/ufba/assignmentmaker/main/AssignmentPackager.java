@@ -55,6 +55,7 @@ public class AssignmentPackager {
 	private Path outputPath;
 	private Path skeletonPath = Path.of("src/main/resources/skel"); 
 	private boolean shouldBuildAfterCreating = false;
+	private boolean shouldCreateGitRepository = true;
 	private boolean replaceExistingOutputFolder = false;
 	
 	public static final String TEST_CLASS_SUFFIX = "Test";
@@ -166,12 +167,14 @@ public class AssignmentPackager {
 		// Create git repo, already with remote info, ready for pushing into github
 		for (Path path : Arrays.asList(testProjPath, assignmentPath, solutionPath)) {
 			try {
-				exec("git init", path.toFile());
-				exec("git add .", path.toFile());
-				exec("git commit -m \"Initial commit\"", path.toFile());
-				exec("git remote add origin https://github.com/" + organizationName + "/" + path.getFileName(), path.toFile());
-//				exec("gh repo create " + organizationName + "/" + path.getFileName() + " --private", path.toFile());
-//				exec("git push -u origin master", path.toFile());
+				if (shouldCreateGitRepository) {
+					exec("git init", path.toFile());
+					exec("git add .", path.toFile());
+					exec("git commit -m \"Initial commit\"", path.toFile());
+					exec("git remote add origin https://github.com/" + organizationName + "/" + path.getFileName(), path.toFile());
+//					exec("gh repo create " + organizationName + "/" + path.getFileName() + " --private", path.toFile());
+//					exec("git push -u origin master", path.toFile());
+				}
 			} catch (IOException | InterruptedException e) {
 				System.out.println("Could not init git repository");
 				e.printStackTrace();
@@ -403,13 +406,21 @@ public class AssignmentPackager {
 		this.replaceExistingOutputFolder = deleteDestinationIfExists;
 	}
 
+	public boolean isShouldCreateGitRepository() {
+		return shouldCreateGitRepository;
+	}
+
+	public void setShouldCreateGitRepository(boolean shouldCreateGitRepository) {
+		this.shouldCreateGitRepository = shouldCreateGitRepository;
+	}
+
 	public static void main(String[] args) throws IOException {
 		AssignmentPackager packager = new AssignmentPackager("ufba-poo-2022-1", Path.of("."), Path.of("/tmp/assignments/"));
 		packager.setShouldBuildAfterCreating(true);
 		packager.setReplaceExistingOutputFolder(true);
 		packager.generatePackages();
 	}
-
+	
 }
 
 class TemplateScope {
