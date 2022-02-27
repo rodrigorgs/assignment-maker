@@ -7,7 +7,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.io.StringReader;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
@@ -30,18 +33,15 @@ import org.apache.maven.shared.invoker.InvocationResult;
 import org.apache.maven.shared.invoker.Invoker;
 import org.apache.maven.shared.invoker.MavenInvocationException;
 
-import com.github.javaparser.JavaParser;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier.Keyword;
 import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
-import com.github.javaparser.ast.type.Type;
 import com.github.mustachejava.DefaultMustacheFactory;
 import com.github.mustachejava.Mustache;
 import com.github.mustachejava.MustacheFactory;
@@ -72,6 +72,10 @@ public class AssignmentPackager {
 	
 	public void generatePackages() throws IOException {
 		Path path = inputPath.resolve(Path.of("src/main/java"));
+
+		createDirectoryIfNotExists(outputPath);
+		copyResource("build-all.sh", true);
+		copyResource("create-push.sh", true);
 		
 		Files.walk(path)
         .filter(p -> p.toString().endsWith(".java"))
@@ -181,8 +185,41 @@ public class AssignmentPackager {
 			}
 		}
 	}
+	
+	private void copyResource(String filename, boolean executable) {
+		try {
+			ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+			InputStream inputStream = classLoader.getResourceAsStream(filename);
+			String contents = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+			inputStream.close();
+			
+			try (PrintWriter out = new PrintWriter(outputPath.resolve(filename).toFile())) {
+			    out.println(contents);
+			}
+			
+			if (executable) {
+				outputPath.resolve(filename).toFile().setExecutable(true);
+			}
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
 
+    private static File getFileFromResource(ClassLoader classLoader, String fileName) throws URISyntaxException {
+        URL resource = classLoader.getResource(fileName);
+        if (resource == null) {
+            throw new IllegalArgumentException("file not found! " + fileName);
+        } else {
 
+            // failed if files have whitespaces or special characters
+            //return new File(resource.getFile());
+
+            return new File(resource.toURI());
+        }
+
+    }
+	
+	
 	private void createTypeFile(Path projectPath, CompilationUnit cu, TypeDeclaration<?> type, boolean isAssignment) {
 		CompilationUnit newCu = new CompilationUnit();
 		cu.getPackageDeclaration().ifPresent(p -> { newCu.setPackageDeclaration(p); });
