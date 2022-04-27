@@ -230,6 +230,7 @@ public class AssignmentPackager {
 		if (isAssignment) {
 			transformer.transform(newType);
 			transformer.removeAnnotationImports(newCu);
+			transformer.removeAssignmentAnnotations(newCu);
 		} else {
 			transformer.removeAnnotationImports(newCu);
 			transformer.removeAssignmentAnnotations(newCu);
