@@ -9,6 +9,7 @@ import java.util.List;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
+import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.BodyDeclaration;
 import com.github.javaparser.ast.body.CallableDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -26,6 +27,8 @@ import com.github.javaparser.ast.stmt.BlockStmt;
 
 import br.ufba.assignmentmaker.annotations.Assignment;
 import br.ufba.assignmentmaker.annotations.Remove;
+import br.ufba.assignmentmaker.annotations.RemoveExtends;
+import br.ufba.assignmentmaker.annotations.RemoveImplements;
 import br.ufba.assignmentmaker.annotations.ReplaceBodyWithCode;
 import br.ufba.assignmentmaker.annotations.ReplaceBodyWithMethod;
 
@@ -61,7 +64,7 @@ public class Transformer {
 	
 	public void removeAssignmentAnnotations(TypeDeclaration<?> c) {
 		// TODO: replace string list with reflection
-		List<String> annotationsToRemove = Arrays.asList("Assignment", "Remove", "ReplaceBodyWithCode", "ReplaceBodyWithMethod");
+		List<String> annotationsToRemove = Arrays.asList("Assignment", "Remove", "ReplaceBodyWithCode", "ReplaceBodyWithMethod", "Comment", "RemoveExtends", "RemoveImplements");
 		c.findAll(AnnotationExpr.class).stream().forEach(a -> {
 			if (annotationsToRemove.contains(a.getNameAsString())) {
 				a.remove();
@@ -77,7 +80,15 @@ public class Transformer {
 	
 	public void transform(TypeDeclaration<?> c) {
 		
+		c.getAnnotationByClass(RemoveImplements.class).ifPresent(annotation -> {
+			((ClassOrInterfaceDeclaration)c).setImplementedTypes(new NodeList<>());
+		});
+		c.getAnnotationByClass(RemoveExtends.class).ifPresent(annotation -> {
+			((ClassOrInterfaceDeclaration)c).setExtendedTypes(new NodeList<>());
+		});
+		
 		processRemoveAnnotation(c);
+		
 		c.getAnnotationByClass(Assignment.class).ifPresent(annotation -> {
 			annotation.remove();
 		});
